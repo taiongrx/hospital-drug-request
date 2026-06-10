@@ -43,10 +43,22 @@ def load_data():
         return df
     else:
         return pd.DataFrame(columns=expected_columns)
-def save_new_request(data_dict):
+def update_request(req_id, new_status, reject_reason, approver):
     df = load_data()
-    df = pd.concat([df, pd.DataFrame([data_dict])], ignore_index=True)
-    df.to_csv(DB_FILE, index=False)
+    
+    # 🔴 เพิ่ม 3 บรรทัดนี้: บังคับให้คอลัมน์เป้าหมายเป็น Object เพื่อให้รับค่าที่เป็นข้อความได้
+    df['สถานะการอนุมัติ'] = df['สถานะการอนุมัติ'].astype('object')
+    df['เหตุผล(กรณีไม่อนุมัติ)'] = df['เหตุผล(กรณีไม่อนุมัติ)'].astype('object')
+    df['ผู้อนุมัติ'] = df['ผู้อนุมัติ'].astype('object')
+    
+    idx = df.index[df['รหัสคำขอ'] == req_id].tolist()
+    if idx:
+        df.at[idx[0], 'สถานะการอนุมัติ'] = new_status
+        df.at[idx[0], 'เหตุผล(กรณีไม่อนุมัติ)'] = reject_reason
+        df.at[idx[0], 'ผู้อนุมัติ'] = approver
+        df.to_csv(DB_FILE, index=False)
+        return True
+    return False
 
 def update_request(req_id, new_status, reject_reason, approver):
     df = load_data()
