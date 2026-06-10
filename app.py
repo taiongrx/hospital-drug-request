@@ -32,21 +32,24 @@ def load_data():
     
     if os.path.exists(DB_FILE):
         df = pd.read_csv(DB_FILE)
-        # ตรวจสอบและเพิ่มคอลัมน์ที่ขาดหายไป เพื่อรองรับข้อมูลเวอร์ชันเก่า
+        # ตรวจสอบและเพิ่มคอลัมน์ที่ขาดหายไป
         for col in expected_columns:
             if col not in df.columns:
                 if col == "รหัสคำขอ":
-                    # หากเป็นข้อมูลเก่าที่ไม่มีรหัส ให้สร้างรหัสชั่วคราวให้
                     df[col] = [f"REQ-OLD-{i+1}" for i in range(len(df))]
                 else:
                     df[col] = "-"
         return df
     else:
         return pd.DataFrame(columns=expected_columns)
+
+def save_new_request(data_dict):
+    df = load_data()
+    df = pd.concat([df, pd.DataFrame([data_dict])], ignore_index=True)
+    df.to_csv(DB_FILE, index=False)
+
 def update_request(req_id, new_status, reject_reason, approver):
     df = load_data()
-    
-    # 🔴 เพิ่ม 3 บรรทัดนี้: บังคับให้คอลัมน์เป้าหมายเป็น Object เพื่อให้รับค่าที่เป็นข้อความได้
     df['สถานะการอนุมัติ'] = df['สถานะการอนุมัติ'].astype('object')
     df['เหตุผล(กรณีไม่อนุมัติ)'] = df['เหตุผล(กรณีไม่อนุมัติ)'].astype('object')
     df['ผู้อนุมัติ'] = df['ผู้อนุมัติ'].astype('object')
@@ -60,26 +63,37 @@ def update_request(req_id, new_status, reject_reason, approver):
         return True
     return False
 
-def update_request(req_id, new_status, reject_reason, approver):
+# ฟังก์ชันสำหรับแก้ไขรายละเอียดคำขอ
+def edit_request_details(req_id, updated_data):
     df = load_data()
+    # ปรับทุกคอลัมน์ให้รองรับข้อความ/ตัวเลขตามต้องการ
+    for col in df.columns:
+        df[col] = df[col].astype('object')
+        
     idx = df.index[df['รหัสคำขอ'] == req_id].tolist()
     if idx:
-        df.at[idx[0], 'สถานะการอนุมัติ'] = new_status
-        df.at[idx[0], 'เหตุผล(กรณีไม่อนุมัติ)'] = reject_reason
-        df.at[idx[0], 'ผู้อนุมัติ'] = approver
+        for key, val in updated_data.items():
+            df.at[idx[0], key] = val
         df.to_csv(DB_FILE, index=False)
         return True
     return False
 
+# ฟังก์ชันสำหรับลบคำขอ
+def delete_request(req_id):
+    df = load_data()
+    df = df[df['รหัสคำขอ'] != req_id]
+    df.to_csv(DB_FILE, index=False)
+    return True
+
 # ตกแต่ง Sidebar
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2966/2966327.png", width=100) # โลโก้จำลอง
+    st.image("https://cdn-icons-png.flaticon.com/512/2966/2966327.png", width=100)
     st.title("ระบบยืม-คืนยา")
     st.markdown("โรงพยาบาลสมเด็จพระยุพราชสายบุรี")
     st.divider()
     menu = st.radio("📌 เมนูการทำงาน", [
         "📝 ฟอร์มขอเบิก/ยืมยา", 
-        "👨‍⚕️ พิจารณาอนุมัติ", 
+        "👨‍⚕️ จัดการคำขอและอนุมัติ", 
         "📊 Dashboard ติดตามสถานะ"
     ])
 
@@ -91,7 +105,6 @@ if menu == "📝 ฟอร์มขอเบิก/ยืมยา":
     st.caption("กรอกข้อมูลให้ครบถ้วนเพื่อความรวดเร็วในการพิจารณาอนุมัติ")
     
     with st.form("borrow_form", clear_on_submit=True):
-        # ใช้ container แบ่งโซนให้ดูง่ายขึ้น
         with st.container(border=True):
             st.markdown("#### 👤 ส่วนที่ 1: ข้อมูลผู้ขอ")
             col1, col2, col3 = st.columns(3)
@@ -106,7 +119,6 @@ if menu == "📝 ฟอร์มขอเบิก/ยืมยา":
 
         with st.container(border=True):
             st.markdown("#### 💊 ส่วนที่ 2: รายการยา/เวชภัณฑ์ที่ต้องการ")
-            
             c_item1, c_qty1 = st.columns([3, 1])
             item1 = c_item1.text_input("รายการที่ 1 *")
             qty1 = c_qty1.number_input("จำนวน (1)", min_value=0, step=1)
@@ -129,7 +141,6 @@ if menu == "📝 ฟอร์มขอเบิก/ยืมยา":
             
         st.info("💡 รหัสคำขอจะถูกสร้างอัตโนมัติหลังจากกดบันทึกข้อมูล")
         
-        # จัดตำแหน่งปุ่มให้อยู่ตรงกลางหรือขวา
         col_blank, col_btn = st.columns([4, 1])
         with col_btn:
             submitted = st.form_submit_button("ส่งคำขอ 📤", use_container_width=True)
@@ -138,7 +149,7 @@ if menu == "📝 ฟอร์มขอเบิก/ยืมยา":
             if not req_name or not target_hospital or not item1 or not department:
                 st.error("⚠️ กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน")
             else:
-                req_id = f"REQ-{datetime.now().strftime('%Y%m%d-%H%M')}"
+                req_id = f"REQ-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
                 new_record = {
                     "รหัสคำขอ": req_id,
                     "วันที่บันทึก": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -159,66 +170,123 @@ if menu == "📝 ฟอร์มขอเบิก/ยืมยา":
                 st.success(f"✅ ส่งคำขอสำเร็จ! รหัสอ้างอิง: **{req_id}**")
 
 # ==========================================
-# เมนูที่ 2: สำหรับเภสัชกร
+# เมนูที่ 2: จัดการคำขอและอนุมัติ (แก้ไข / ลบ / อนุมัติ)
 # ==========================================
-elif menu == "👨‍⚕️ พิจารณาอนุมัติ":
-    st.header("👨‍⚕️ หน้าต่างพิจารณาอนุมัติคำขอยืมยา")
+elif menu == "👨‍⚕️ จัดการคำขอและอนุมัติ":
+    st.header("👨‍⚕️ หน้าต่างจัดการและพิจารณาอนุมัติคำขอ")
     
     df = load_data()
     if df.empty:
         st.info("ไม่มีข้อมูลคำขอในระบบ")
     else:
-        active_requests = df[df["สถานะการอนุมัติ"].isin(["รอพิจารณา", "รอยา"])]
+        st.subheader("📋 รายการคำขอทั้งหมดในระบบ")
+        display_all = df.copy()
+        display_all["สถานะ"] = display_all["สถานะการอนุมัติ"].map(STATUS_COLORS)
+        st.dataframe(display_all[["รหัสคำขอ", "ผู้ขอเบิก", "ฝ่าย/กลุ่มงาน", "โรงพยาบาลที่ขอยืม", "สถานะ"]], hide_index=True, use_container_width=True)
         
-        if active_requests.empty:
-            st.success("🎉 ปัจจุบันไม่มีรายการค้างพิจารณา ยอดเยี่ยมมากครับ!")
-        else:
-            st.subheader("📋 รายการที่ต้องดำเนินการ")
+        st.divider()
+        st.subheader("🛠️ เครื่องมือจัดการคำขอ")
+        
+        # ค้นหาและเลือกจากคำขอทั้งหมดที่มีในฐานข้อมูล เพื่อให้ลบหรือแก้ไขย้อนหลังได้
+        all_req_list = df["รหัสคำขอ"].tolist()
+        selected_req = st.selectbox("🔍 เลือกรหัสคำขอที่ต้องการดำเนินการ", ["-- กรุณาเลือกรหัสคำขอ --"] + all_req_list)
+        
+        if selected_req != "-- กรุณาเลือกรหัสคำขอ --":
+            selected_data = df[df["รหัสคำขอ"] == selected_req].iloc[0]
             
-            # ปรับแต่งตารางให้อ่านง่ายขึ้น
-            display_df = active_requests[["รหัสคำขอ", "ผู้ขอเบิก", "ฝ่าย/กลุ่มงาน", "โรงพยาบาลที่ขอยืม", "สถานะการอนุมัติ"]]
-            display_df["สถานะ"] = display_df["สถานะการอนุมัติ"].map(STATUS_COLORS)
-            st.dataframe(display_df.drop(columns=["สถานะการอนุมัติ"]), hide_index=True, use_container_width=True)
+            # ใช้ st.tabs แยกฟังก์ชันการทำงานให้เป็นสัดส่วน ไม่ปนกัน
+            tab_approve, tab_edit, tab_delete = st.tabs([
+                "📥 1. อัปเดตสถานะอนุมัติ", 
+                "✏️ 2. แก้ไขรายละเอียดคำขอ", 
+                "❌ 3. ลบคำขอออกจากระบบ"
+            ])
             
-            st.divider()
-            st.subheader("🔄 อัปเดตสถานะคำขอ")
-            
-            with st.container(border=True):
-                req_list = active_requests["รหัสคำขอ"].tolist()
-                selected_req = st.selectbox("🔍 เลือกรหัสคำขอที่ต้องการจัดการ", ["-- กรุณาเลือก --"] + req_list)
+            # --- TAB 1: พิจารณาอนุมัติ ---
+            with tab_approve:
+                st.markdown("#### เปลี่ยนแปลงสถานะการดำเนินงาน")
+                with st.form("approval_form"):
+                    col_stat, col_name = st.columns(2)
+                    with col_stat:
+                        new_status = st.selectbox(
+                            "อัปเดตสถานะเป็น", 
+                            ["รอพิจารณา", "รอยา", "รับยาแล้ว", "ไม่อนุมัติ"],
+                            index=["รอพิจารณา", "รอยา", "รับยาแล้ว", "ไม่อนุมัติ"].index(selected_data["สถานะการอนุมัติ"])
+                        )
+                    with col_name:
+                        approver_name = st.text_input("ชื่อเภสัชกรผู้ดำเนินการ *", value=selected_data["ผู้อนุมัติ"] if selected_data["ผู้อนุมัติ"] != "-" else "")
+                        
+                    reject_reason = st.text_input("หมายเหตุ / เหตุผลกรณีไม่อนุมัติ", value=selected_data["เหตุผล(กรณีไม่อนุมัติ)"])
+                    
+                    update_btn = st.form_submit_button("💾 บันทึกการอัปเดตสถานะ", use_container_width=True)
+                    if update_btn:
+                        if not approver_name:
+                            st.error("⚠️ กรุณาระบุชื่อเภสัชกรผู้ดำเนินการ")
+                        elif new_status == "ไม่อนุมัติ" and (reject_reason == "-" or not reject_reason):
+                            st.error("⚠️ กรุณาระบุเหตุผลกรณีไม่อนุมัติ")
+                        else:
+                            if update_request(selected_req, new_status, reject_reason, approver_name):
+                                st.success("✅ อัปเดตสถานะเรียบร้อยแล้ว")
+                                st.rerun()
+
+            # --- TAB 2: แก้ไขข้อมูลต้นฉบับ ---
+            with tab_edit:
+                st.markdown("#### แก้ไขเนื้อหาคำขอเบิก/ยืมยา")
+                with st.form("edit_details_form"):
+                    col_e1, col_e2, col_e3 = st.columns(3)
+                    with col_e1:
+                        e_name = st.text_input("ชื่อผู้ขอเบิก", value=selected_data["ผู้ขอเบิก"])
+                    with col_e2:
+                        e_pos = st.text_input("ตำแหน่ง", value=selected_data["ตำแหน่ง"])
+                    with col_e3:
+                        e_dept = st.text_input("ฝ่าย/กลุ่มงาน", value=selected_data["ฝ่าย/กลุ่มงาน"])
+                        
+                    e_hosp = st.text_input("ขอสนับสนุนจากโรงพยาบาล", value=selected_data["โรงพยาบาลที่ขอยืม"])
+                    
+                    st.markdown("##### รายการยาที่ต้องการแก้ไข")
+                    col_i1, col_q1 = st.columns([3, 1])
+                    e_item1 = col_i1.text_input("รายการที่ 1", value=selected_data["รายการที่ 1"])
+                    e_qty1 = col_q1.number_input("จำนวน (1)", value=int(selected_data["จำนวนที่ 1"]), min_value=0, step=1)
+                    
+                    col_i2, col_q2 = st.columns([3, 1])
+                    e_item2 = col_i2.text_input("รายการที่ 2", value=str(selected_data["รายการที่ 2"]) if pd.notna(selected_data["รายการที่ 2"]) else "")
+                    e_qty2 = col_q2.number_input("จำนวน (2)", value=int(selected_data["จำนวนที่ 2"]) if pd.notna(selected_data["จำนวนที่ 2"]) and str(selected_data["จำนวนที่ 2"]) != "-" else 0, min_value=0, step=1)
+                    
+                    # จัดการแปลงวันที่ให้อยู่ในฟอร์แมตที่ถูกต้องก่อนแสดงผลในตัวเลือก
+                    try:
+                        default_date = datetime.strptime(selected_data["ต้องการใช้ภายในวันที่"], "%Y-%m-%d").date()
+                    except:
+                        default_date = datetime.now().date()
+                        
+                    e_date = st.date_input("แก้ไขวันที่ต้องการใช้", value=default_date)
+                    
+                    save_edit_btn = st.form_submit_button("✏️ บันทึกการแก้ไขข้อมูลคำขอ", use_container_width=True)
+                    if save_edit_btn:
+                        updated_fields = {
+                            "ผู้ขอเบิก": e_name,
+                            "ตำแหน่ง": e_pos,
+                            "ฝ่าย/กลุ่มงาน": e_dept,
+                            "โรงพยาบาลที่ขอยืม": e_hosp,
+                            "รายการที่ 1": e_item1, "จำนวนที่ 1": e_qty1,
+                            "รายการที่ 2": e_item2, "จำนวนที่ 2": e_qty2,
+                            "ต้องการใช้ภายในวันที่": e_date.strftime("%Y-%m-%d")
+                        }
+                        if edit_request_details(selected_req, updated_fields):
+                            st.success("🎉 แก้ไขรายละเอียดข้อมูลสำเร็จ!")
+                            st.rerun()
+
+            # --- TAB 3: ลบข้อมูลออกจากระบบ ---
+            with tab_delete:
+                st.markdown("#### ⚠️ เขตอันตราย: ลบรายการข้อมูล")
+                st.warning(f"คุณกำลังจะทำการลบคำขอรหัส {selected_req} ของคุณ {selected_data['ผู้ขอเบิก']} ออกจากระบบอย่างถาวร ข้อมูลนี้จะไม่สามารถกู้คืนได้")
                 
-                if selected_req != "-- กรุณาเลือก --":
-                    selected_data = active_requests[active_requests["รหัสคำขอ"] == selected_req].iloc[0]
-                    
-                    # แสดงสรุปข้อมูลแบบ Card
-                    st.info(f"**ผู้ขอ:** {selected_data['ผู้ขอเบิก']} ({selected_data['ฝ่าย/กลุ่มงาน']}) \n\n"
-                            f"**ยืมจาก:** {selected_data['โรงพยาบาลที่ขอยืม']} \n\n"
-                            f"**รายการหลัก:** {selected_data['รายการที่ 1']} (จำนวน {selected_data['จำนวนที่ 1']})")
-                    
-                    with st.form("approval_form"):
-                        col_stat, col_name = st.columns(2)
-                        with col_stat:
-                            new_status = st.selectbox(
-                                "อัปเดตสถานะเป็น", 
-                                ["รอพิจารณา", "รอยา", "รับยาแล้ว", "ไม่อนุมัติ"],
-                                index=["รอพิจารณา", "รอยา", "รับยาแล้ว", "ไม่อนุมัติ"].index(selected_data["สถานะการอนุมัติ"])
-                            )
-                        with col_name:
-                            approver_name = st.text_input("ชื่อเภสัชกรผู้ดำเนินการ *")
-                            
-                        reject_reason = st.text_input("หมายเหตุ (จำเป็นหากเลือก 'ไม่อนุมัติ')", value="-")
-                        
-                        update_btn = st.form_submit_button("💾 บันทึกการอัปเดต", use_container_width=True)
-                        
-                        if update_btn:
-                            if not approver_name:
-                                st.error("⚠️ กรุณาระบุชื่อเภสัชกรผู้ดำเนินการ")
-                            elif new_status == "ไม่อนุมัติ" and (reject_reason == "-" or not reject_reason):
-                                st.error("⚠️ กรุณาระบุเหตุผลกรณีไม่อนุมัติ")
-                            else:
-                                if update_request(selected_req, new_status, reject_reason, approver_name):
-                                    st.success(f"✅ อัปเดตสถานะเป็น '{new_status}' เรียบร้อยแล้ว")
-                                    st.rerun() # รีเฟรชหน้าจออัตโนมัติ
+                # เพิ่ม Checkbox เพื่อยืนยันความตั้งใจ ป้องกันการเผลอกดโดน
+                confirm_delete = st.checkbox("ฉันยืนยันว่าต้องการลบข้อมูลคำขอนี้จริง")
+                
+                delete_btn = st.button("🗑️ ลบคำขอนี้ทันที", type="primary", disabled=not confirm_delete, use_container_width=True)
+                if delete_btn and confirm_delete:
+                    if delete_request(selected_req):
+                        st.success("🗑️ ลบข้อมูลออกจากระบบเรียบร้อยแล้ว")
+                        st.rerun()
 
 # ==========================================
 # เมนูที่ 3: Dashboard ติดตามสถานะ
@@ -227,11 +295,9 @@ elif menu == "📊 Dashboard ติดตามสถานะ":
     st.header("📊 Dashboard ภาพรวมการยืม-คืนยา")
     
     df = load_data()
-    
     if df.empty:
         st.info("ยังไม่มีข้อมูลในระบบ")
     else:
-        # ใช้ container แยกส่วนสรุปตัวเลข
         with st.container(border=True):
             total = len(df)
             pending = len(df[df["สถานะการอนุมัติ"] == "รอพิจารณา"])
@@ -247,7 +313,6 @@ elif menu == "📊 Dashboard ติดตามสถานะ":
             c5.metric("🔴 ไม่อนุมัติ", rejected)
         
         col_chart, col_table = st.columns([1, 1])
-        
         with col_chart:
             st.write("📈 **สัดส่วนสถานะคำขอ**")
             status_counts = df["สถานะการอนุมัติ"].value_counts()
@@ -262,16 +327,6 @@ elif menu == "📊 Dashboard ติดตามสถานะ":
         st.divider()
         st.write("🗂️ **ฐานข้อมูลคำขอทั้งหมด**")
         
-        # ใส่สีในตารางแสดงผลรวม
         display_all = df.copy()
         display_all["สถานะการอนุมัติ"] = display_all["สถานะการอนุมัติ"].map(STATUS_COLORS)
-        
-        # ปรับการแสดงผลคอลัมน์ให้อ่านง่ายขึ้น
-        st.dataframe(
-            display_all.sort_values("วันที่บันทึก", ascending=False), 
-            hide_index=True, 
-            use_container_width=True,
-            column_config={
-                "วันที่บันทึก": st.column_config.DatetimeColumn("วันที่บันทึก", format="D MMM YYYY, h:mm a"),
-            }
-        )
+        st.dataframe(display_all.sort_values("วันที่บันทึก", ascending=False), hide_index=True, use_container_width=True)
