@@ -23,17 +23,26 @@ STATUS_COLORS = {
 }
 
 def load_data():
+    expected_columns = [
+        "รหัสคำขอ", "วันที่บันทึก", "ผู้ขอเบิก", "ตำแหน่ง", "ฝ่าย/กลุ่มงาน", 
+        "โรงพยาบาลที่ขอยืม", "รายการที่ 1", "จำนวนที่ 1",
+        "รายการที่ 2", "จำนวนที่ 2", "รายการที่ 3", "จำนวนที่ 3",
+        "ต้องการใช้ภายในวันที่", "เวลา", "สถานะการอนุมัติ", "เหตุผล(กรณีไม่อนุมัติ)", "ผู้อนุมัติ"
+    ]
+    
     if os.path.exists(DB_FILE):
-        return pd.read_csv(DB_FILE)
+        df = pd.read_csv(DB_FILE)
+        # ตรวจสอบและเพิ่มคอลัมน์ที่ขาดหายไป เพื่อรองรับข้อมูลเวอร์ชันเก่า
+        for col in expected_columns:
+            if col not in df.columns:
+                if col == "รหัสคำขอ":
+                    # หากเป็นข้อมูลเก่าที่ไม่มีรหัส ให้สร้างรหัสชั่วคราวให้
+                    df[col] = [f"REQ-OLD-{i+1}" for i in range(len(df))]
+                else:
+                    df[col] = "-"
+        return df
     else:
-        columns = [
-            "รหัสคำขอ", "วันที่บันทึก", "ผู้ขอเบิก", "ตำแหน่ง", "ฝ่าย/กลุ่มงาน", 
-            "โรงพยาบาลที่ขอยืม", "รายการที่ 1", "จำนวนที่ 1",
-            "รายการที่ 2", "จำนวนที่ 2", "รายการที่ 3", "จำนวนที่ 3",
-            "ต้องการใช้ภายในวันที่", "เวลา", "สถานะการอนุมัติ", "เหตุผล(กรณีไม่อนุมัติ)", "ผู้อนุมัติ"
-        ]
-        return pd.DataFrame(columns=columns)
-
+        return pd.DataFrame(columns=expected_columns)
 def save_new_request(data_dict):
     df = load_data()
     df = pd.concat([df, pd.DataFrame([data_dict])], ignore_index=True)
