@@ -12,7 +12,7 @@ import json
 CHANNEL_ACCESS_TOKEN = "aa06833cf611b754e37dca32ee10fe6e"
 
 # 2. นำ User ID (ที่ขึ้นต้นด้วย U) มาใส่ในเครื่องหมายคำพูดด้านล่าง
-TARGET_USER_ID = "2010354488"
+TARGET_USER_ID = "U425aa8491536cf53a578cf8219b74267"
 
 # ฟังก์ชันสำหรับส่งข้อความผ่าน LINE OA
 def send_line_oa_message(message_text):
