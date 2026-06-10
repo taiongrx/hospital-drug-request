@@ -9,7 +9,7 @@ import json
 # 🔑 ตั้งค่า LINE Messaging API (LINE OA)
 # ==========================================
 # 1. นำ Channel Access Token (ยาวๆ) มาใส่ในเครื่องหมายคำพูดด้านล่าง
-CHANNEL_ACCESS_TOKEN = "aa06833cf611b754e37dca32ee10fe6e"
+CHANNEL_ACCESS_TOKEN = "ubOQt7lYRoszvumGqPEkrIFAcA3RK9JqA4Qkq5SIcTvvv+wa4R4zUVfOqHRNDyLOaY6HYuSSkebXXcy5I8v2xeD18rAagMn1pA/Zq9nZQVzRVeu0gTWbTiYTU+InhTXLh2hldYxI8tCu88PxwhBHHQdB04t89/1O/w1cDnyilFU="
 
 # 2. นำ User ID (ที่ขึ้นต้นด้วย U) มาใส่ในเครื่องหมายคำพูดด้านล่าง
 TARGET_USER_ID = "U425aa8491536cf53a578cf8219b74267"
