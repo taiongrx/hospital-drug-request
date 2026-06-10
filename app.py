@@ -239,4 +239,18 @@ elif menu == "📊 Dashboard ติดตามสถานะ":
             st.dataframe(hosp_counts, hide_index=True, use_container_width=True)
             
         st.divider()
-        st.write("
+        st.write("🗂️ **ฐานข้อมูลคำขอทั้งหมด**")
+        
+        # ใส่สีในตารางแสดงผลรวม
+        display_all = df.copy()
+        display_all["สถานะการอนุมัติ"] = display_all["สถานะการอนุมัติ"].map(STATUS_COLORS)
+        
+        # ปรับการแสดงผลคอลัมน์ให้อ่านง่ายขึ้น
+        st.dataframe(
+            display_all.sort_values("วันที่บันทึก", ascending=False), 
+            hide_index=True, 
+            use_container_width=True,
+            column_config={
+                "วันที่บันทึก": st.column_config.DatetimeColumn("วันที่บันทึก", format="D MMM YYYY, h:mm a"),
+            }
+        )
