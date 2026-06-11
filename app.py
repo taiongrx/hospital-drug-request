@@ -12,7 +12,7 @@ import json
 CHANNEL_ACCESS_TOKEN = "ubOQt7lYRoszvumGqPEkrIFAcA3RK9JqA4Qkq5SIcTvvv+wa4R4zUVfOqHRNDyLOaY6HYuSSkebXXcy5I8v2xeD18rAagMn1pA/Zq9nZQVzRVeu0gTWbTiYTU+InhTXLh2hldYxI8tCu88PxwhBHHQdB04t89/1O/w1cDnyilFU="
 
 # 2. User ID (ตั้งค่าให้แล้ว)
-TARGET_USER_ID = "U425aa8491536cf53a578cf8219b74267"
+TARGET_USER_ID = "C1780c21bdcd9af527f4fe49d96358968"
 
 # ฟังก์ชันสำหรับส่งข้อความผ่าน LINE OA
 def send_line_oa_message(message_text):
